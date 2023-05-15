@@ -17,26 +17,6 @@ import (
 	"time"
 )
 
-func printBanner() {
-	fmt.Println(`
-______                    ______       _ _    
-| ___ \                   | ___ \     | | |   
-| |_/ /___  ___ ___  _ __ | |_/ /_   _| | | __
-|    // _ \/ __/ _ \| '_ \| ___ \ | | | | |/ /
-| |\ \  __/ (_| (_) | | | | |_/ / |_| | |   < 
-\_| \_\___|\___\___/|_| |_\____/ \__,_|_|_|\_\
-                                              
-                                              
-					V.1.0 
-					Taurus Omar`)
-	                                                                          
-	fmt.Println()
-}
-
-func banner() {
-	printBanner()
-
-}
 
 var (
 	amassProcess, subfinderProcess, assetfinderProcess, findomainProcess *os.Process
@@ -61,20 +41,20 @@ func executeCmd(cmd *exec.Cmd, sleepSeconds int) {
 }
 
 
-func startAmass(domain, resolversFile, resultDir string) *exec.Cmd {
+func startAmass(domain, resultDir string) *exec.Cmd {
     amassOutput := filepath.Join(resultDir, fmt.Sprintf("amass_%s.txt", domain))
     amassDir := filepath.Join(resultDir, fmt.Sprintf("%s_amass", domain))
     err := os.MkdirAll(amassDir, 0755)
     checkErr(err)
-    cmd := exec.Command("amass", "enum", "-passive", "-d", domain, "-src", "-dir", amassDir, "-o", amassOutput, "-rf", resolversFile)
+    cmd := exec.Command("amass", "enum", "-passive", "-d", domain, "-src", "-dir", amassDir, "-o", amassOutput)
     showOutputInRealTime(cmd)
     return cmd
 }
 
 
-func startSubfinder(domain, resolversFile, resultDir string) *exec.Cmd {
+func startSubfinder(domain, resultDir string) *exec.Cmd {
 	subfinderOutput := filepath.Join(resultDir, fmt.Sprintf("subfinder_%s.txt", domain))
-	cmd := exec.Command("subfinder", "-nW", "-d", domain, "-rL", resolversFile, "-o", subfinderOutput)
+	cmd := exec.Command("subfinder", "-nW", "-d", domain, "-o", subfinderOutput)
 	showOutputInRealTime(cmd)
 	return cmd
 }
@@ -86,18 +66,18 @@ func startAssetfinder(domain, resultDir string) *exec.Cmd {
 	return cmd
 }
 
-func startFindomain(domain, resolversFile, resultDir string) *exec.Cmd {
+func startFindomain(domain, resultDir string) *exec.Cmd {
 	findomainOutput := filepath.Join(resultDir, fmt.Sprintf("findomain_%s.txt", domain))
-	cmd := exec.Command("findomain", "--target", domain, "--resolvers", resolversFile, "--threads", "40", "-u", findomainOutput)
+	cmd := exec.Command("findomain", "--target", domain, "--threads", "40", "-u", findomainOutput)
 	showOutputInRealTime(cmd)
 	return cmd
 }
 
-func findSubdomains(domain, resolversFile, resultDir string) (*os.Process, *os.Process, *os.Process, *os.Process) {
-	amassCmd := startAmass(domain, resolversFile, resultDir)
-	subfinderCmd := startSubfinder(domain, resolversFile, resultDir)
+func findSubdomains(domain, resultDir string) (*os.Process, *os.Process, *os.Process, *os.Process) {
+	amassCmd := startAmass(domain, resultDir)
+	subfinderCmd := startSubfinder(domain, resultDir)
 	assetfinderCmd := startAssetfinder(domain, resultDir)
-	findomainCmd := startFindomain(domain, resolversFile, resultDir)
+	findomainCmd := startFindomain(domain, resultDir)
 
 	go executeCmd(amassCmd, 5)
 	go executeCmd(subfinderCmd, 5)
@@ -180,11 +160,11 @@ func writeUniqueSubdomainsToFile(filename string, uniqueSubdomains map[string]st
 	checkErr(err)
 }
 
-func findIPs(domain, resolversFile, resultDir string) {
+func findIPs(domain, resultDir string) {
 	fmt.Println("Now finding IPs for subdomains...")
 	subdomainsOutput := filepath.Join(resultDir, fmt.Sprintf("%s.subdomains.txt", domain))
 	ipsOutput := filepath.Join(resultDir, fmt.Sprintf("%s.ips.txt", domain))
-	cmd := exec.Command("massdns", "-r", resolversFile, "-t", "A", "-o", "S", "-w", ipsOutput, subdomainsOutput)
+	cmd := exec.Command("massdns", "-t", "A", "-o", "S", "-w", ipsOutput, subdomainsOutput)
 	showOutputInRealTime(cmd)
 	cmd.Run()
 	fmt.Printf("IPs written to: %s\n", ipsOutput)
@@ -271,26 +251,23 @@ func scanNuclei(domain, resultDir string) {
 	fmt.Printf("Nuclei results written to: %s\n", nucleiOutput)
 }
 
-func gau(domain, resultDir string) {
+func cariddi(domain, resultDir string) {
 	fmt.Println("Scanning all urls...")
-	sortedGauOutput := filepath.Join(resultDir, fmt.Sprintf("sorted_gau_%s.txt", domain))
-	gauOutput := filepath.Join(resultDir, fmt.Sprintf("gau_%s.txt", domain))
-	cmd := exec.Command("gau",sortedHttpxOutput,"-oo", gauOutput)
+	sortedcariddiOutput := filepath.Join(resultDir, fmt.Sprintf("sorted_cariddi_%s.txt", domain))
+	cariddiOutput := filepath.Join(resultDir, fmt.Sprintf("cariddi_%s.txt", domain))
+	cmd := exec.Command("cariddi",sortedcariddiOutput,"-ot", cariddiOutput)
 	showOutputInRealTime(cmd)
 	cmd.Run()
-	fmt.Printf("Gau results written to: %s\n", gauOutput)
+	fmt.Printf("cariddi results written to: %s\n", cariddiOutput)
 }
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("2nd argument not supplied")
-		fmt.Println("2nd argument is the resolver file list path")
+	if len(os.Args) < 2 {
 		fmt.Println("Usage : ./reconbulk domain resolvers_list")
 		os.Exit(1)
 	}
 
 	domain := os.Args[1]
-	resolversFile := os.Args[2]
 	dt := time.Now().Format("2006-01-02.15.04.05")
 	reconDir := filepath.Join(os.Getenv("HOME"), "recon")
 	resultDir := filepath.Join(reconDir, fmt.Sprintf("results/%s-%s", domain, dt))
@@ -304,7 +281,7 @@ func main() {
 		os.Exit(1)
 	}()
 
-	amassProcess, subfinderProcess, assetfinderProcess, findomainProcess = findSubdomains(domain, resolversFile, resultDir)
+	amassProcess, subfinderProcess, assetfinderProcess, findomainProcess = findSubdomains(domain, resultDir)
 	if amassProcess != nil {
 	    amassProcess.Wait()
 	}
@@ -318,11 +295,11 @@ func main() {
 	    findomainProcess.Wait()
 	}
 
-	printBanner()
 	scanCRT(domain, resultDir) 
 	combineSubdomains(domain, resultDir)
-	findIPs(domain, resolversFile, resultDir)
+	findIPs(domain, resultDir)
 	scanHttpx(domain, resultDir)
 	scanNaabu(domain, resultDir)
+	cariddi(domain, resultDir)
 	scanNuclei(domain, resultDir)
 }
