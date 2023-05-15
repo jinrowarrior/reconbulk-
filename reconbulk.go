@@ -99,26 +99,12 @@ func findSubdomains(domain, resolversFile, resultDir string) (*os.Process, *os.P
 	assetfinderCmd := startAssetfinder(domain, resultDir)
 	findomainCmd := startFindomain(domain, resolversFile, resultDir)
 
-func runGau(domain, resultDir string) {
-	fmt.Println("Running gau...")
-	subdomainsOutput := filepath.Join(resultDir, fmt.Sprintf("%s.subdomains.txt", domain))
-	gauOutput := filepath.Join(resultDir, fmt.Sprintf("gau_%s.txt", domain))
-	cmd := exec.Command("gau", domain,"--o", gauOutput)
-	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("GAU_DOMAIN=%s", domain))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("GAU_SUBDOMAINS=%s", subdomainsOutput))
-	showOutputInRealTime(cmd)
-	cmd.Run()
-	fmt.Printf("gau results written to: %s\n", gauOutput)
-}
-	
 	go executeCmd(amassCmd, 5)
 	go executeCmd(subfinderCmd, 5)
 	go executeCmd(assetfinderCmd, 5)
 	go executeCmd(findomainCmd, 5)
-	go executeCmd(runGau, 5)
 
-	return amassCmd.Process, subfinderCmd.Process, assetfinderCmd.Process, findomainCmd.Process, runGau.Process
+	return amassCmd.Process, subfinderCmd.Process, assetfinderCmd.Process, findomainCmd.Process
 }
 
 func scanCRT(domain, resultDir string) {
@@ -285,6 +271,16 @@ func scanNuclei(domain, resultDir string) {
 	fmt.Printf("Nuclei results written to: %s\n", nucleiOutput)
 }
 
+func gau(domain, resultDir string) {
+	fmt.Println("Scanning all urls...")
+	sortedGauOutput := filepath.Join(resultDir, fmt.Sprintf("sorted_gau_%s.txt", domain))
+	gauOutput := filepath.Join(resultDir, fmt.Sprintf("gau_%s.txt", domain))
+	cmd := exec.Command("gau",sortedHttpxOutput,"-oo", gauOutput)
+	showOutputInRealTime(cmd)
+	cmd.Run()
+	fmt.Printf("Gau results written to: %s\n", gauOutput)
+}
+
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Println("2nd argument not supplied")
@@ -321,9 +317,6 @@ func main() {
 	if findomainProcess != nil {
 	    findomainProcess.Wait()
 	}
-	if runGauProcess != nil {
-	    runGauProcess.Wait()
-	}	
 
 	printBanner()
 	scanCRT(domain, resultDir) 
